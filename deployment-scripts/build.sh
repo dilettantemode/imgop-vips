@@ -25,13 +25,26 @@ else
     exit 1
 fi
 
-docker build --platform linux/${PLATFORM} --build-arg PLATFORM=${PLATFORM} -f Dockerfile.build-vips -t libvips-builder:8.17.2 .
-docker run cat /home/libvips.zip > libvips.zip
+docker build --platform linux/${PLATFORM} --build-arg PLATFORM=${PLATFORM} --output "build" -f Dockerfile.build-vips -t libvips-builder:8.17.2 . 
+
+# Debug: show what was extracted
+echo "Contents of build directory:"
+ls -lh build/
 
 # Move the file to build folder in root project
 # Make dir build if not exists
 mkdir -p ../build
-mv libvips.zip ../build/libvips-${LABEL_DATE}.zip
 
-echo "Wrote: libvips.zip"
-
+# Move the libvips.zip file from local build directory to project build directory
+if [ -f "build/libvips.zip" ]; then
+    FILE_SIZE=$(du -h build/libvips.zip | cut -f1)
+    mv build/libvips.zip ../build/libvips.zip
+    echo "✓ Success: Wrote libvips.zip (${FILE_SIZE}) to ../build/"
+    # Clean up the local build directory
+    rm -rf build
+else
+    echo "✗ Error: build/libvips.zip not found"
+    echo "Available files in build/:"
+    ls -la build/ 2>/dev/null || echo "  (build directory doesn't exist)"
+    exit 1
+fi

@@ -41,12 +41,20 @@ RUN tar -xvf libvips.tar.xz
 
 # Change into the extracted vips directory
 WORKDIR ${VIPS_DIR}/vips-${VIPS_VERSION}
-RUN meson setup build --prefix ${VIPS_DIR}/build
+RUN meson setup build --prefix ${VIPS_DIR}/vips-${VIPS_VERSION}/build
 
 WORKDIR ${VIPS_DIR}/vips-${VIPS_VERSION}/build
 RUN meson compile
 RUN meson test
 RUN meson install
+RUN mv ${VIPS_DIR}/vips-${VIPS_VERSION}/build ${VIPS_DIR}/build
+
+RUN ls -R ${VIPS_DIR} >> ${VIPS_DIR}/build/vips.txt
 
 # Zip all data in vips directory
-RUN zip -r /home/libvips.zip ${VIPS_DIR}/vips-${VIPS_VERSION} -x "*.gitignore"
+WORKDIR ${VIPS_DIR}
+RUN zip -r libvips.zip ${VIPS_DIR}/build
+
+# Export stage to extract the zip file
+FROM scratch AS export
+COPY --from=0 /home/vips/libvips.zip /libvips.zip
