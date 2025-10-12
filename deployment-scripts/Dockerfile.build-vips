@@ -1,7 +1,6 @@
 # Dockerfile.build-vips
-# Using Ubuntu for reliable public package repositories
-ARG PLATFORM=amd64
-FROM --platform=linux/${PLATFORM} alpine:3.22.2
+# Using Ubuntu for reliable public package repositorie
+FROM alpine:3.22.2
 
 ARG VIPS_VERSION=8.17.2
 ARG VIPS_DIR=/home/vips
@@ -47,13 +46,11 @@ WORKDIR ${VIPS_DIR}/vips-${VIPS_VERSION}/build
 RUN meson compile
 RUN meson test
 RUN meson install
-RUN mv ${VIPS_DIR}/vips-${VIPS_VERSION}/build ${VIPS_DIR}/build
-
-RUN ls -R ${VIPS_DIR} >> ${VIPS_DIR}/build/vips.txt
+RUN mv ${VIPS_DIR}/vips-${VIPS_VERSION}/build/bin ${VIPS_DIR}/build
 
 # Zip all data in vips directory
 WORKDIR ${VIPS_DIR}
-RUN zip -r libvips.zip ${VIPS_DIR}/build
+RUN zip -rj libvips.zip ${VIPS_DIR}/build
 
 # Export stage to extract the zip file
 FROM scratch AS export

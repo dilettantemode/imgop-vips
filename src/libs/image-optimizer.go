@@ -1,4 +1,4 @@
-package imgop
+package libs
 
 import (
 	"fmt"

@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	libs "imgop/src/libs"
+
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
@@ -16,10 +18,10 @@ type ImageRequest struct {
 	Quality int    `json:"quality,omitempty"`
 }
 
-var optimizer *ImageOptimizerHandler
+var optimizer *libs.ImageOptimizerHandler
 
 func init() {
-	optimizer = NewImageOptimizer()
+	optimizer = libs.NewImageOptimizer()
 }
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -50,10 +52,8 @@ func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.API
 		fmt.Sscanf(q, "%d", &quality)
 	}
 
-	// Validate quality range
-
 	// Call the optimizer
-	imageBytes := optimizer.Optimize(ParamsOptimize{
+	imageBytes := optimizer.Optimize(libs.ParamsOptimize{
 		Url:     url,
 		Width:   width,
 		Height:  height,
