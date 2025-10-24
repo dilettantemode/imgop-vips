@@ -1,33 +1,16 @@
-# Get the directory where this script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Get label today as yyyymmdd
-LABEL_DATE=$(date +%Y%m%d)
+echo "Building bootstrap binary in Amazon Linux 2 (GLIBC 2.26)..."
 
-docker build --output "build" -f Dockerfile.build-vips -t libvips-builder:8.17.2 . 
+# Build using Docker
+docker build --output build -f deployment-scripts/docker/Dockerfile.build-bootstrap -t bootstrap-builder:al2 .
 
-# Debug: show what was extracted
-echo "Contents of build directory:"
-ls -lh build/
+echo "✅ Bootstrap binary built for Amazon Linux 2"
+echo ""
+echo "Verifying binary..."
+file build/bootstrap
+echo ""
+echo "Checking GLIBC version requirements..."
+objdump -T build/bootstrap 2>/dev/null | grep GLIBC | sed 's/.*GLIBC_/GLIBC_/' | sort -Vu | tail -3 || echo "Could not check GLIBC version"
 
-# Remove app.zip and libvips.zip if exist
-rm -f ../build/app.zip
-rm -f ../build/libvips.zip
-
-# Move the libvips.zip file from local build directory to project build directory
-if [ -f "build/libvips.zip" ]; then
-    FILE_SIZE=$(du -h build/libvips.zip | cut -f1)
-    mv build/libvips.zip ../build/libvips.zip
-    echo "✓ Success: Wrote libvips.zip (${FILE_SIZE}) to ../build/"
-    # Clean up the local build directory
-    rm -rf build
-else
-    echo "✗ Error: build/libvips.zip not found"
-    echo "Available files in build/:"
-    ls -la build/ 2>/dev/null || echo "  (build directory doesn't exist)"
-    exit 1
-fi
-
-# Zip bootstrap to bootstrap.zip
-zip -j ../build/app.zip ../build/bootstrap
