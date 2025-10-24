@@ -9,9 +9,8 @@ A serverless image optimization service running on AWS Lambda that converts and 
 make deploy
 
 # 2. Deploy to AWS
-# - Upload build/libvips.zip as Lambda Layer
-# - Upload build/app.zip as Lambda Function
-# - Configure as shown below
+- Upload build/libvips.zip as Lambda Layer
+- Upload build/app.zip as Lambda Function
 ```
 
 ## Requirements
@@ -19,6 +18,20 @@ make deploy
 - Docker (for building in Amazon Linux 2023 environment)
 - AWS CLI configured with credentials
 - Go 1.21+ (for local development only)
+
+## Lambda Setup
+
+For setting up lambda, you can use this configuration:
+- Runtime: `Amazon Linux 2023`
+- Handler: `bootstrap`
+- Architecture: `x86_64`
+- Configure -> Environment:
+  - `ALLOWED_ORIGINS=yoursite.com,static.yoursite.com`
+  - `LD_LIBRARY_PATH=/opt/bin:/opt/lib:/opt/lib64`
+
+For hardware configuration, you can use the default minimum configuration:
+- Memory - 128MB
+- Ephemeral storage: 512MB
 
 ## Building
 
@@ -41,7 +54,7 @@ make dev
 
 Builds the bootstrap binary locally for quick testing. **Note:** May not work on Lambda due to GLIBC version differences.
 
-## AWS Lambda Deployment
+## AWS Lambda Deployment - Script
 
 ### Step 1: Create Lambda Layer
 
@@ -68,7 +81,7 @@ aws lambda create-function \
     --handler bootstrap \
     --zip-file fileb://build/app.zip \
     --timeout 30 \
-    --memory-size 512 \
+    --memory-size 128 \
     --architectures x86_64 \
     --layers arn:aws:lambda:REGION:ACCOUNT:layer:libvips-runtime:VERSION
 ```
@@ -244,8 +257,7 @@ imgop/
 - Bootstrap binary is built in Amazon Linux 2023 for GLIBC compatibility
 - Layer contains libvips 8.17.2 + all runtime dependencies
 - Docker build ensures compatibility with Lambda environment
-- Minimum 512 MB memory recommended for image processing
 
 ## License
 
-MIT
+MIT License
