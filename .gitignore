@@ -1,0 +1,7 @@
+# Output
+bootstrap
+function.zip
+build/*
+static/output-test.webp
+.env
+libvips-*.zip

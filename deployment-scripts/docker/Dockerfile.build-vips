@@ -1,0 +1,59 @@
+# Dockerfile.build-vips
+# Using Ubuntu for reliable public package repositorie
+FROM alpine:3.22.2
+
+ARG VIPS_VERSION=8.17.2
+ARG VIPS_DIR=/home/vips
+RUN mkdir -p ${VIPS_DIR}/build 
+
+# Install build tools + common image libs
+RUN apk update 
+RUN apk add coreutils 
+RUN apk add curl 
+RUN apk add gzip 
+RUN apk add tar 
+RUN apk add zip 
+RUN apk add expat-dev
+RUN apk add zlib-dev
+RUN apk add libjpeg-turbo-dev
+RUN apk add libpng-dev 
+RUN apk add glib-dev
+
+RUN apk add libwebp-dev 
+RUN apk add libexif-dev 
+RUN apk add libxml2-dev 
+
+RUN apk add git 
+RUN apk add python3 
+
+RUN apk add xz 
+RUN apk add alpine-sdk
+RUN apk add pkgconfig 
+RUN apk add meson 
+RUN apk add ninja 
+
+# Create working directory and download vips
+RUN curl -L https://github.com/libvips/libvips/releases/download/v${VIPS_VERSION}/vips-${VIPS_VERSION}.tar.xz -o ${VIPS_DIR}/libvips.tar.xz
+
+# Install libvips
+WORKDIR ${VIPS_DIR}
+RUN tar -xvf libvips.tar.xz
+
+# Change into the extracted vips directory
+WORKDIR ${VIPS_DIR}/vips-${VIPS_VERSION}
+RUN meson setup build --prefix ${VIPS_DIR}/vips-${VIPS_VERSION}/build
+
+WORKDIR ${VIPS_DIR}/vips-${VIPS_VERSION}/build
+RUN meson compile
+RUN meson test
+RUN meson install
+RUN mv ${VIPS_DIR}/vips-${VIPS_VERSION}/build/bin ${VIPS_DIR}/build
+RUN mv ${VIPS_DIR}/vips-${VIPS_VERSION}/build/lib ${VIPS_DIR}/build
+
+# Zip all data in vips directory
+WORKDIR ${VIPS_DIR}
+RUN cd build && zip -r libvips.zip bin lib
+
+# Export stage to extract the zip file
+FROM scratch AS export
+COPY --from=0 /home/vips/build/libvips.zip /libvips.zip
