@@ -8,6 +8,7 @@ RUN mkdir -p ${VIPS_DIR}/build
 
 # Install build tools + common image libs
 RUN apk update 
+RUN apk add coreutils 
 RUN apk add curl 
 RUN apk add gzip 
 RUN apk add tar 
@@ -47,11 +48,12 @@ RUN meson compile
 RUN meson test
 RUN meson install
 RUN mv ${VIPS_DIR}/vips-${VIPS_VERSION}/build/bin ${VIPS_DIR}/build
+RUN mv ${VIPS_DIR}/vips-${VIPS_VERSION}/build/lib ${VIPS_DIR}/build
 
 # Zip all data in vips directory
 WORKDIR ${VIPS_DIR}
-RUN zip -rj libvips.zip ${VIPS_DIR}/build
+RUN cd build && zip -r libvips.zip bin lib
 
 # Export stage to extract the zip file
 FROM scratch AS export
-COPY --from=0 /home/vips/libvips.zip /libvips.zip
+COPY --from=0 /home/vips/build/libvips.zip /libvips.zip

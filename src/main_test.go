@@ -1,4 +1,4 @@
-package imgop
+package main
 
 import (
 	"context"
