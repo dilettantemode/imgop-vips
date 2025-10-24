@@ -64,6 +64,7 @@ imgop/
 │
 ├── deployment-scripts/          # All deployment and testing infrastructure
 │   ├── docker/                 # Docker files
+│   │   ├── Dockerfile.build-bootstrap
 │   │   ├── Dockerfile.build-vips
 │   │   ├── Dockerfile.lambda-build
 │   │   └── Dockerfile.test

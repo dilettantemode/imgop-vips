@@ -1,0 +1,88 @@
+# Stage 1: Build libvips 8.17.2
+FROM amazonlinux:2023 AS builder
+
+ARG VIPS_VERSION=8.17.2
+
+# Install build dependencies (added xz)
+RUN dnf install -y gcc gcc-c++ make wget 
+RUN dnf install -y tar gzip zip git 
+RUN dnf install -y pkgconfig python3 python3-pip ninja-build
+RUN dnf install -y glib2-devel expat-devel 
+RUN dnf install -y libjpeg-turbo-devel libpng-devel libwebp-devel
+RUN dnf install -y libexif-devel libxml2-devel zlib-devel xz
+RUN dnf install -y golang
+RUN dnf clean all
+
+RUN pip3 install --no-cache-dir meson
+
+# Download and build libvips
+WORKDIR /tmp
+RUN wget -q https://github.com/libvips/libvips/releases/download/v${VIPS_VERSION}/vips-${VIPS_VERSION}.tar.xz && \
+    tar -xf vips-${VIPS_VERSION}.tar.xz
+
+WORKDIR /tmp/vips-${VIPS_VERSION}
+RUN meson setup build --prefix=/usr/local --buildtype=release
+WORKDIR /tmp/vips-${VIPS_VERSION}/build
+RUN meson compile && meson install
+
+RUN ldconfig
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY src/ ./src/
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o bootstrap src/main.go
+
+RUN cd /app && zip -r bootstrap.zip bootstrap
+
+# Stage 3: prepare export vips layer with runtime dependencies
+FROM amazonlinux:2023 AS vips-layer
+COPY --from=builder /opt /opt
+COPY --from=builder /usr/bin /usr/bin
+COPY --from=builder /usr/lib /usr/lib
+COPY --from=builder /usr/lib64 /usr/lib64
+COPY --from=builder /usr/local /opt/vips
+
+WORKDIR /app
+RUN mkdir -p /app/lambda/bin
+RUN mkdir -p /app/lambda/lib64
+
+RUN cp -r /opt/vips/bin/* lambda/bin/
+RUN rm -f lambda/bin/meson
+RUN cp -r /opt/vips/lib64/* lambda/lib64/
+
+RUN cp /usr/lib64/libpthread.so.0 lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libdl.so.2 lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/librt.so.1 lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libresolv.so lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libresolv.so.2 lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libexpat.so lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libexpat.so.1 lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libexif.so lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libexif.so.12 lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libwebp.so lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libwebp.so.7 lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libjpeg.so lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libjpeg.so.62 lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libpng16.so lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libpng16.so.16 lambda/lib64/ 2>/dev/null || true
+
+RUN cp /usr/lib64/libwebp.so lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libwebp.so.7 lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libwebpdecoder.so lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libwebpdecoder.so.3 lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libwebpdemux.so lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libwebpdemux.so.2 lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libwebpmux.so lambda/lib64/ 2>/dev/null || true
+RUN cp /usr/lib64/libwebpmux.so.3 lambda/lib64/ 2>/dev/null || true
+
+
+RUN cd /app/lambda && zip -r libvips-glibc.zip ./
+
+# Stage 5: Export vips layer with runtime dependencies
+FROM scratch AS export
+COPY --from=vips-layer /app/lambda/libvips-glibc.zip /libvips.zip
+COPY --from=builder /app/bootstrap /bootstrap
+COPY --from=builder /app/bootstrap.zip /bootstrap.zip
