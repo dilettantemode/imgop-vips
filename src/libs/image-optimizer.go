@@ -16,9 +16,7 @@ var allowedOrigins []string
 
 func init() {
 	// Initialize with default origins
-	allowedOrigins = []string{
-		"lh3.googleusercontent.com",
-	}
+	allowedOrigins = []string{}
 
 	// Read additional origins from environment variable
 	envOrigins := os.Getenv("ALLOWED_ORIGINS")
