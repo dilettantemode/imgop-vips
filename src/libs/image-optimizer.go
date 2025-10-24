@@ -5,16 +5,50 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
+	"strings"
 
 	"github.com/cshum/vipsgen/vips"
 )
 
-var allowedOrigins = []string{
-	"tarkams.com",
-	"s.tarkams.com",
-	"staging-files.tarkams.com",
-	"lh3.googleusercontent.com",
+var allowedOrigins []string
+
+func init() {
+	// Initialize with default origins
+	allowedOrigins = []string{
+		"lh3.googleusercontent.com",
+	}
+
+	// Read additional origins from environment variable
+	envOrigins := os.Getenv("ALLOWED_ORIGINS")
+	if envOrigins != "" {
+		// Split by comma and trim whitespace
+		origins := strings.Split(envOrigins, ",")
+		for _, origin := range origins {
+			trimmed := strings.TrimSpace(origin)
+			if trimmed != "" && !slices.Contains(allowedOrigins, trimmed) {
+				allowedOrigins = append(allowedOrigins, trimmed)
+			}
+		}
+	}
+}
+
+// GetAllowedOrigins returns a copy of the allowed origins list
+func GetAllowedOrigins() []string {
+	return append([]string{}, allowedOrigins...)
+}
+
+// SetAllowedOrigins sets the allowed origins (useful for testing)
+func SetAllowedOrigins(origins []string) {
+	allowedOrigins = origins
+}
+
+// AddAllowedOrigin adds a single origin to the allowed list
+func AddAllowedOrigin(origin string) {
+	if origin != "" && !slices.Contains(allowedOrigins, origin) {
+		allowedOrigins = append(allowedOrigins, origin)
+	}
 }
 
 type ImageOptimizerHandler struct{}
