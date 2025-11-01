@@ -14,10 +14,18 @@ type AppEnv struct {
 	SECRET_KEY      string
 	MAX_WIDTH       int
 	MAX_HEIGHT      int
+	FETCH_TIMEOUT   int
 }
 
 var appEnv *AppEnv
 var once sync.Once
+
+// ResetAppEnvForTesting resets the singleton for testing purposes
+// This should only be called in tests
+func ResetAppEnvForTesting() {
+	appEnv = nil
+	once = sync.Once{}
+}
 
 func GetAppEnv() *AppEnv {
 	once.Do(func() {
@@ -50,11 +58,19 @@ func GetAppEnv() *AppEnv {
 			}
 		}
 
+		fetchTimeout := 5
+		if fetchTimeoutStr := os.Getenv("FETCH_TIMEOUT"); fetchTimeoutStr != "" {
+			if ft, err := strconv.Atoi(fetchTimeoutStr); err == nil && ft > 0 {
+				fetchTimeout = ft
+			}
+		}
+
 		appEnv = &AppEnv{
 			ALLOWED_ORIGINS: allowedOrigins,
 			SECRET_KEY:      os.Getenv("SECRET_KEY"),
 			MAX_WIDTH:       maxWidth,
 			MAX_HEIGHT:      maxHeight,
+			FETCH_TIMEOUT:   fetchTimeout,
 		}
 	})
 	return appEnv
