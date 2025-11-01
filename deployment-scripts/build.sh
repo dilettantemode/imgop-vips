@@ -4,7 +4,7 @@ set -euo pipefail
 echo "Building bootstrap binary in Amazon Linux 2 (GLIBC 2.26)..."
 
 # Build using Docker
-docker build --output build -f deployment-scripts/docker/Dockerfile.build-bootstrap -t bootstrap-builder:al2 .
+docker build --output build -f deployment-scripts/docker/Dockerfile.build -t bootstrap-builder:al2 .
 
 echo "✅ Bootstrap binary built for Amazon Linux 2"
 echo ""
