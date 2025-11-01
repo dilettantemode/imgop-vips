@@ -16,6 +16,7 @@ make deploy
 ## Requirements
 
 - Docker (for building in Amazon Linux 2023 environment)
+- Docker permission should be setup for current use, do not sudo if possible
 - AWS CLI configured with credentials
 - Go 1.21+ (for local development only)
 

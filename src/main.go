@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net/http"
+	"strconv"
 
+	"imgop/src/helpers"
 	libs "imgop/src/libs"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -25,63 +28,111 @@ func init() {
 }
 
 func handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	// Parse query parameters
-	url := req.QueryStringParameters["url"]
-	if url == "" {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 400,
-			Body:       `{"error": "Missing 'url' parameter"}`,
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-		}, nil
+	// Check authentication
+	appEnv := helpers.GetAppEnv()
+	authHeader := req.Headers["secret-auth-key"]
+	if authHeader != appEnv.SECRET_KEY {
+		return errResponse(fmt.Errorf("Forbidden, secret key is incorrect"), http.StatusForbidden)
 	}
 
-	// Parse optional parameters with defaults
-	width := 0
-	height := 0
-	quality := 80
-
-	if w := req.QueryStringParameters["w"]; w != "" {
-		fmt.Sscanf(w, "%d", &width)
+	width, err1 := parseParams[int](req.QueryStringParameters, "w")
+	if err1 != nil {
+		return errResponse(err1, http.StatusUnprocessableEntity)
 	}
-	if h := req.QueryStringParameters["h"]; h != "" {
-		fmt.Sscanf(h, "%d", &height)
+	height, err2 := parseParams[int](req.QueryStringParameters, "h")
+	if err2 != nil {
+		return errResponse(err2, http.StatusUnprocessableEntity)
 	}
-	if q := req.QueryStringParameters["q"]; q != "" {
-		fmt.Sscanf(q, "%d", &quality)
+	quality, err3 := parseParams[int](req.QueryStringParameters, "q")
+	if err3 != nil {
+		return errResponse(err3, http.StatusUnprocessableEntity)
 	}
-
-	// Call the optimizer
-	imageBytes := optimizer.Optimize(libs.ParamsOptimize{
-		Url:     url,
+	urlParams, err4 := parseParams[string](req.QueryStringParameters, "url")
+	if err4 != nil {
+		return errResponse(err4, http.StatusUnprocessableEntity)
+	}
+	// Get and validate query parameters
+	imageParams := libs.ParamsOptimize{
+		Url:     urlParams,
 		Width:   width,
 		Height:  height,
 		Quality: quality,
-	})
-
-	if len(imageBytes) == 0 {
-		return events.APIGatewayProxyResponse{
-			StatusCode: 400,
-			Body:       `{"error": "Failed to optimize image. Check URL and allowed origins."}`,
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-		}, nil
 	}
 
-	// Return base64-encoded image for API Gateway
-	encodedImage := base64.StdEncoding.EncodeToString(imageBytes)
+	imageParams, err := validateParams(imageParams)
+	if err != nil {
+		return errResponse(err, http.StatusUnprocessableEntity)
+	}
 
+	imageBytes := optimizer.Optimize(imageParams)
+	cacheTime := "31536000" // 1 year cache
 	return events.APIGatewayProxyResponse{
 		StatusCode:      200,
-		Body:            encodedImage,
+		Body:            base64.StdEncoding.EncodeToString(imageBytes),
 		IsBase64Encoded: true,
 		Headers: map[string]string{
 			"Content-Type":  "image/webp",
-			"Cache-Control": "public, max-age=31536000",
+			"Cache-Control": "public, max-age=" + cacheTime + ", s-maxage=" + cacheTime, // 1 year cache
 		},
 	}, nil
+}
+
+func parseParams[T int | string](reqParams map[string]string, key string) (T, error) {
+	var zero T
+	value, ok := reqParams[key]
+	if !ok {
+		return zero, fmt.Errorf("missing %s parameter", key)
+	}
+
+	switch any(zero).(type) {
+	case int:
+		if val, err := strconv.Atoi(value); err == nil {
+			return any(val).(T), nil
+		}
+		return zero, fmt.Errorf("invalid integer value for %s parameter", key)
+	case string:
+		return any(value).(T), nil
+	}
+
+	return zero, nil
+}
+
+func errResponse(err error, statusCode int) (events.APIGatewayProxyResponse, error) {
+	cacheControl := "public, max-age=259200, s-maxage=259200" // 3 days cache
+	if statusCode == http.StatusForbidden {
+		cacheControl = "public, max-age=60, s-maxage=60"
+	}
+
+	return events.APIGatewayProxyResponse{
+		StatusCode: statusCode,
+		Body:       fmt.Sprintf(`{"error": "%s"}`, err.Error()),
+		Headers: map[string]string{
+			"Content-Type":  "application/json",
+			"Cache-Control": cacheControl,
+		},
+	}, nil
+}
+
+func validateParams(params libs.ParamsOptimize) (libs.ParamsOptimize, error) {
+	appEnv := helpers.GetAppEnv()
+	imageParams := libs.ParamsOptimize{
+		Url:     params.Url,
+		Width:   params.Width,
+		Height:  params.Height,
+		Quality: params.Quality,
+	}
+
+	if imageParams.Width < 1 || imageParams.Width > appEnv.MAX_WIDTH {
+		return imageParams, fmt.Errorf("width must be between 1 and %d", appEnv.MAX_WIDTH)
+	}
+	if imageParams.Height < 1 || imageParams.Height > appEnv.MAX_HEIGHT {
+		return imageParams, fmt.Errorf("height must be between 1 and %d", appEnv.MAX_HEIGHT)
+	}
+	if imageParams.Quality < 1 || imageParams.Quality > 100 {
+		return imageParams, fmt.Errorf("quality must be between 1 and 100")
+	}
+
+	return imageParams, nil
 }
 
 func main() {
